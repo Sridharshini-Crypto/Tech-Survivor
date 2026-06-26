@@ -24,6 +24,7 @@ export default function CompetitionPage() {
   const [currentQIndex, setCurrentQIndex] = useState(0);
   const [answer, setAnswer] = useState('');
   const [startTime, setStartTime] = useState<number>(Date.now());
+  const [questionTimers, setQuestionTimers] = useState<Record<string, number>>({});
 
   const { data: rounds = [] } = useQuery<Round[]>({
     queryKey: ['rounds'],
@@ -52,19 +53,27 @@ export default function CompetitionPage() {
     queryFn: () => fetch('/api/settings').then((r) => r.json()),
   });
 
-  const { timeLeft, isRunning, start, reset } = useTimer({
+  const { timeLeft, isRunning, start, pause, reset } = useTimer({
     initialTime: currentQ?.timer || 60,
     onComplete: () => toast.warning('Time is up!'),
   });
-
   useEffect(() => {
     if (currentQ) {
-      reset(currentQ.timer);
-      start();
-      setStartTime(Date.now());
-      setAnswer('');
+      setQuestionTimers((prev) => ({ ...prev, [currentQ.id]: timeLeft }));
     }
-  }, [currentQIndex, currentQ?.id]);
+  }, [timeLeft, currentQ]);
+  useEffect(() => {
+    if (!currentQ) return;
+    const savedTime = questionTimers[currentQ.id] ?? currentQ.timer;
+    reset(savedTime);
+
+    if (!isAnswered) {
+      start();
+    }
+
+    setStartTime(Date.now());
+    setAnswer('');
+  }, [currentQ?.id,isAnswered]);
 
   const onViolation = useCallback((type: string, description: string) => {
     if (!activeRound) return;
@@ -102,6 +111,7 @@ export default function CompetitionPage() {
         return r.json();
       }),
     onSuccess: (data) => {
+      pause();
       queryClient.invalidateQueries({ queryKey: ['submissions'] });
       if (data.is_correct) toast.success('Correct answer!');
       else toast.info('Answer submitted');

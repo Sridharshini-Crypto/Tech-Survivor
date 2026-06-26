@@ -4,7 +4,7 @@ import { useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Trophy, Medal, ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TableSkeleton } from '@/components/ui/skeleton';
@@ -24,6 +24,7 @@ interface LeaderboardEntry {
 }
 
 export default function LeaderboardPage() {
+  const router = useRouter();
   const queryClient = useQueryClient();
 
   const { data: teams = [], isLoading } = useQuery<LeaderboardEntry[]>({
@@ -47,7 +48,17 @@ export default function LeaderboardPage() {
     <div className="min-h-screen bg-[#09090B] py-8 px-4">
       <div className="max-w-3xl mx-auto space-y-6">
         <div className="flex items-center gap-4">
-          <Link href="/" className="text-zinc-500 hover:text-zinc-300"><ArrowLeft className="h-5 w-5" /></Link>
+          <button onClick={() => router.back()} className="text-zinc-500 hover:text-zinc-300"
+            >
+              <ArrowLeft className="h-5 w-5" />
+          </button>
+          <div>
+            <h1 className="text-3xl font-bold text-zinc-100 flex items-center gap-2">
+              <Trophy className="h-8 w-8 text-yellow-400" /> Leaderboard
+            </h1>
+            <p className="text-sm text-zinc-500">Live rankings updated in real-time</p>
+          </div>
+        
           <div>
             <h1 className="text-3xl font-bold text-zinc-100 flex items-center gap-2">
               <Trophy className="h-8 w-8 text-yellow-400" /> Leaderboard
