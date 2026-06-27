@@ -106,7 +106,8 @@ export default function RegisterPage() {
               <Input
                 label="Team Name"
                 placeholder="Choose a unique team name"
-                {...register('team_name', { required: 'Team name is required' })}
+                {...register('team_name', { required: 'Team name is required', minLength: { value: 3, message: 'Min 3 characters' }, pattern: { value: /^[a-zA-Z0-9_]+$/, message: 'Only letters, numbers, and underscores allowed' }
+                })}
                 error={errors.team_name?.message}
               />
 
@@ -136,21 +137,21 @@ export default function RegisterPage() {
               <Input
                 label="Team Leader Name"
                 placeholder="Full name of team leader"
-                {...register('team_leader', { required: 'Team leader name is required' })}
+                {...register('team_leader', { required: 'Team leader name is required', minLength: { value: 3, message: 'Min 3 characters' }, pattern: { value: /^[a-zA-Z\s]+$/, message: 'Only letters and spaces allowed' } })}
                 error={errors.team_leader?.message}
               />
 
               <Input
                 label="College Name"
                 placeholder="Your institution name"
-                {...register('college_name', { required: 'College name is required' })}
+                {...register('college_name', { required: 'College name is required', minLength: { value: 3, message: 'Min 3 characters' } })}
                 error={errors.college_name?.message}
               />
 
               <Input
                 label="Contact Number"
                 placeholder="+91 XXXXX XXXXX"
-                {...register('contact_number', { required: 'Contact number is required' })}
+                {...register('contact_number', { required: 'Contact number is required', pattern: { value: /^\+91\s\d{5}\s\d{5}$/, message: 'Format: +91 XXXXX XXXXX' } })}
                 error={errors.contact_number?.message}
               />
 
@@ -161,7 +162,7 @@ export default function RegisterPage() {
                     <div key={field.id} className="flex gap-2">
                       <Input
                         placeholder={`Member ${index + 1} name`}
-                        {...register(`team_members.${index}.name` as const)}
+                        {...register(`team_members.${index}.name` as const, { validate: (value) => !value || (value.trim().length >= 3 && /^[a-zA-Z\s]+$/.test(value)) || 'Min 3 letters, only letters and spaces allowed' })}
                       />
                       {fields.length > 1 && (
                         <button

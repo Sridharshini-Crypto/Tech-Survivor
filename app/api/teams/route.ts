@@ -1,107 +1,90 @@
-import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
-import { getAdminSession } from '@/lib/auth';
+'use client';
 
-export async function GET(request: Request) {
-  try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+import { useState } from 'react';
+import Link from 'next/link';
+import { useForm, useFieldArray } from 'react-hook-form';
+import { toast } from 'sonner';
+import { UserPlus, ArrowLeft, Plus, Trash2, CheckCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
 
-    const { searchParams } = new URL(request.url);
-    const status = searchParams.get('status');
-
-    const supabase = createAdminClient();
-    let query = supabase
-      .from('teams')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (status && status !== 'all') {
-      query = query.eq('status', status);
-    }
-
-    const { data, error } = await query;
-    if (error) throw error;
-
-    const safe = (data || []).map(({ password_hash: _, ...t }) => t);
-    return NextResponse.json(safe);
-  } catch {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
+interface RegisterForm {
+  team_name: string;
+  password: string;
+  confirm_password: string;
+  team_leader: string;
+  college_name: string;
+  contact_number: string;
+  team_members: { name: string }[];
 }
 
-export async function PATCH(request: Request) {
-  try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+export default function RegisterPage() {
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const { register, handleSubmit, control, watch, formState: { errors } } = useForm<RegisterForm>({
+    defaultValues: {
+      team_members: [{ name: '' }],
+    },
+  });
+  const { fields, append, remove } = useFieldArray({ control, name: 'team_members' });
+  const password = watch('password');
+
+  const onSubmit = async (data: RegisterForm) => {
+    const textRegex = /^[a-zA-Z0-9_]+$/;
+    const nameRegex = /^[a-zA-Z\s]+$/;
+    const phoneRegex = /^\+91\s\d{5}\s\d{5}$/;
+    if (data.team_name.trim().length < 3 || !textRegex.test(data.team_name)) {
+      toast.error('Team name must be at least 3 characters and can only contain letters, numbers, and underscores.');
+      return;
+    }
+    if (data.team_leader.trim().length < 3 || !nameRegex.test(data.team_leader)) {
+      toast.error('Team leader name must be at least 3 characters and can only contain letters and spaces.');
+      return;
+    }
+    if (data.college_name.trim().length < 3) {
+      toast.error('College name must be at least 3 characters.');
+      return;
+    }
+    if (!phoneRegex.test(data.contact_number)) {
+      toast.error('Contact number must be in the format: +91 XXXXX XXXXX');
+      return;
+    }
+    for (const member of data.team_members) {
+      if (member.name.trim() && (member.name.trim().length < 3 || !nameRegex.test(member.name))) {
+        toast.error('Each team member name must be at least 3 characters and can only contain letters and spaces.');
+        return;
+      }
+    }
+    if (data.password !== data.confirm_password) {
+      toast.error('Passwords do not match');
+      return;
     }
 
-    const { id, ...updates } = await request.json();
-    if (!id) {
-      return NextResponse.json({ error: 'Team ID is required' }, { status: 400 });
+    setLoading(true);
+
+    try {
+      const res = await fetch('/api/auth/team-register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          team_name: data.team_name,
+          password: data.password,
+          team_leader: data.team_leader,
+          college_name: data.college_name,
+          contact_number: data.contact_number,
+          team_members: data.team_members.filter((m) => m.name.trim()),
+        }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        toast.error(result.error || 'Registration failed');
+        return;
+      }
+      setSuccess(true);
+    } catch {
+      toast.error('Network error. Please try again.');
+    } finally {
+      setLoading(false);
     }
-
-    const supabase = createAdminClient();
-
-    if (updates.status === 'approved') {
-      updates.approved_at = new Date().toISOString();
-      updates.approved_by = session.entityId;
-    }
-
-    const { data, error } = await supabase
-      .from('teams')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    await supabase.from('audit_log').insert({
-      action: updates.status ? 'team_status_change' : 'update',
-      entity_type: 'team',
-      entity_id: id,
-      actor_type: 'admin',
-      actor_id: session.entityId,
-      details: updates,
-    });
-
-    const { password_hash: _, ...safe } = data;
-    return NextResponse.json(safe);
-  } catch {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
-
-export async function DELETE(request: Request) {
-  try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { id } = await request.json();
-    if (!id) {
-      return NextResponse.json({ error: 'Team ID is required' }, { status: 400 });
-    }
-
-    const supabase = createAdminClient();
-    const { error } = await supabase.from('teams').delete().eq('id', id);
-    if (error) throw error;
-
-    await supabase.from('audit_log').insert({
-      action: 'delete',
-      entity_type: 'team',
-      entity_id: id,
-      actor_type: 'admin',
-      actor_id: session.entityId,
-    });
-
-    return NextResponse.json({ success: true });
-  } catch {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
+}; 
